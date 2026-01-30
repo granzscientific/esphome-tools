@@ -102,14 +102,13 @@ script:
             - lambda: |-
                 id(wifi_wificomponent_id).set_ap_timeout(1);
                 id(wifi_wificomponent_id).enable();
-            #- delay: ${wait_for_initial_setup_duration}
             - script.execute: scr_wait_for_initial_setup
             - while:
                 condition:
                   lambda: 'return (id(scr_wait_for_initial_setup).is_running() && !id(wifi_wificomponent_id).is_connected());'
                 then:
                   - logger.log:
-                      format: "Waiting for initial setup..."
+                      format: "Waiting for WiFi initial setup..."
                       level: WARN
                   - delay: 1s
             - if:
@@ -117,6 +116,18 @@ script:
                   lambda: 'return !id(wifi_wificomponent_id).is_connected();'
                 then:
                   - deep_sleep.enter: deep_sleep_1
+                else:
+                  # Reset the initial setup timer and give the user more time to configure in Home Assistant etc.
+                  - script.stop: scr_wait_for_initial_setup
+                  - script.execute: scr_wait_for_initial_setup
+                  - while:
+                      condition:
+                        lambda: 'return id(scr_wait_for_initial_setup).is_running();'
+                      then:
+                        - logger.log:
+                            format: "Waiting for API initial setup..."
+                            level: WARN
+                        - delay: 1s
       # Check for WiFi connection
       - script.execute: scr_timer_wait_for_wifi
       # While our timer is running AND we haven't yet connected to WiFi
