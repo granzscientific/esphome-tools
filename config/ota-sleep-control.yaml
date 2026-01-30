@@ -169,7 +169,7 @@ script:
           then:
             # API not connected
             - logger.log:
-                format: "No API never connection -- sleeping to save battery."
+                format: "No API connection -- sleeping to save battery."
                 level: WARN
             - deep_sleep.enter: deep_sleep_1
       - script.execute: scr_timer_wait_for_ota_update_mode
