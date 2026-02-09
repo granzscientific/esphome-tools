@@ -89,8 +89,7 @@ script:
   - id: scr_sleep_control
     then:
       - deep_sleep.prevent: deep_sleep_1
-      - lambda: |-
-          id(ota_sleep_control_done) = 'false';
+      - lambda: 'id(ota_sleep_control_state) = 1;'
       - delay: 1s # allow other tasks to get going first
       # First check if WiFi credentials are stored
       - if:
@@ -105,6 +104,7 @@ script:
                 id(wifi_wificomponent_id).set_ap_timeout(1);
                 id(wifi_wificomponent_id).enable();
             - script.execute: scr_wait_for_initial_setup
+            - lambda: 'id(ota_sleep_control_state) = 2;'
             - while:
                 condition:
                   lambda: 'return (id(scr_wait_for_initial_setup).is_running() && !id(wifi_wificomponent_id).is_connected());'
@@ -122,6 +122,7 @@ script:
                   # Reset the initial setup timer and give the user more time to configure in Home Assistant etc.
                   - script.stop: scr_wait_for_initial_setup
                   - script.execute: scr_wait_for_initial_setup
+                  - lambda: 'id(ota_sleep_control_state) = 3;'
                   - while:
                       condition:
                         lambda: 'return id(scr_wait_for_initial_setup).is_running();'
@@ -132,6 +133,7 @@ script:
                         - delay: 1s
       # Check for WiFi connection
       - script.execute: scr_timer_wait_for_wifi
+      - lambda: 'id(ota_sleep_control_state) = 4;'
       # While our timer is running AND we haven't yet connected to WiFi
       - while:
           condition:
@@ -156,6 +158,7 @@ script:
                   - deep_sleep.enter: deep_sleep_1
       # Connected to WiFi
       - script.execute: scr_timer_wait_for_api_connection
+      - lambda: 'id(ota_sleep_control_state) = 5;'
       # While our timer is running AND we aren't connected to home assistant
       - while:
           condition:
@@ -175,6 +178,7 @@ script:
                 level: WARN
             - deep_sleep.enter: deep_sleep_1
       - script.execute: scr_timer_wait_for_ota_update_mode
+      - lambda: 'id(ota_sleep_control_state) = 6;'
       # While our timer is running AND we don't have any state from Home Assistant for 'ota_update_mode' entity
       - while:
           condition:
@@ -202,11 +206,10 @@ script:
                 format: "Please read the manual to configure OTA update mode switch in Home Assistant."
                 level: ERROR
             - deep_sleep.allow: deep_sleep_1
-      - lambda: |-
-          id(ota_sleep_control_done) = 'true';
+      - lambda: 'id(ota_sleep_control_state) = 0;'
 
 globals:
-  - id: ota_sleep_control_done
-    type: bool
+  - id: ota_sleep_control_state
+    type: int
     restore_value: no
-    initial_value: 'false'
+    initial_value: 0
