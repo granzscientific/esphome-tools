@@ -212,4 +212,4 @@ globals:
   - id: ota_sleep_control_state
     type: int
     restore_value: no
-    initial_value: 0
+    initial_value: '0'
