@@ -89,6 +89,7 @@ script:
   - id: scr_sleep_control
     then:
       - deep_sleep.prevent: deep_sleep_1
+      - lambda: 'id(ota_sleep_control_done) = false;'
       - delay: 1s # allow other tasks to get going first
       # First check if WiFi credentials are stored
       - if:
@@ -200,3 +201,10 @@ script:
                 format: "Please read the manual to configure OTA update mode switch in Home Assistant."
                 level: ERROR
             - deep_sleep.allow: deep_sleep_1
+      - lambda: 'id(ota_sleep_control_done) = true;'
+
+globals:
+  - id: ota_sleep_control_done
+    type: bool
+    restore_value: no
+    initial_value: false
