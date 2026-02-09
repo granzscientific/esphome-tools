@@ -208,5 +208,5 @@ script:
 globals:
   - id: ota_sleep_control_done
     type: bool
-    restore_value: False
-    initial_value: false
+    restore_value: no
+    initial_value: 'false'
