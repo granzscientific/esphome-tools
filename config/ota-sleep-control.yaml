@@ -85,27 +85,25 @@ script:
   - id: scr_timer_wait_for_ota_update_mode
     then:
       - delay: ${wait_for_ota_update_mode_duration}
-  # Script that runs on boot to control if we go to sleep or stay awake (for setup, OTA update etc.)
+  # Main script that runs on boot to control if we go to sleep or stay awake (for setup, OTA update etc.)
   - id: scr_sleep_control
     then:
       - deep_sleep.prevent: deep_sleep_1
       - lambda: 'id(ota_sleep_control_state) = 1;'
       - delay: 1s # allow other tasks to get going first
-      # First check if WiFi credentials are stored
-      - if:
+      - if: # First check if WiFi credentials are stored
           condition:
             lambda: 'return !id(wifi_wificomponent_id).has_sta();'
           then:
             - logger.log:
                 format: "No WiFi credentials are stored -- staying awake for ${wait_for_initial_setup_duration} to allow initial setup."
                 level: ERROR
-            # Force AP on (this may not be needed because of default behavior)
-            - lambda: |-
+            - lambda: |- # Force AP on (this may not be needed because of default behavior)
                 id(wifi_wificomponent_id).set_ap_timeout(1);
                 id(wifi_wificomponent_id).enable();
+                id(ota_sleep_control_state) = 2;
             - script.execute: scr_wait_for_initial_setup
-            - lambda: 'id(ota_sleep_control_state) = 2;'
-            - while:
+            - while: # While our timer is running AND we haven't yet connected to WiFi
                 condition:
                   lambda: 'return (id(scr_wait_for_initial_setup).is_running() && !id(wifi_wificomponent_id).is_connected());'
                 then:
@@ -113,29 +111,15 @@ script:
                       format: "Waiting for WiFi initial setup..."
                       level: WARN
                   - delay: 1s
-            - if:
+            - if: # If we still aren't connected to WiFi goto sleep to save the battery
                 condition:
                   lambda: 'return !id(wifi_wificomponent_id).is_connected();'
                 then:
                   - deep_sleep.enter: deep_sleep_1
-                else:
-                  # Reset the initial setup timer and give the user more time to configure in Home Assistant etc.
-                  - script.stop: scr_wait_for_initial_setup
-                  - script.execute: scr_wait_for_initial_setup
-                  - lambda: 'id(ota_sleep_control_state) = 3;'
-                  - while:
-                      condition:
-                        lambda: 'return id(scr_wait_for_initial_setup).is_running();'
-                      then:
-                        - logger.log:
-                            format: "Waiting for API initial setup..."
-                            level: WARN
-                        - delay: 1s
-      # Check for WiFi connection
+      # Now Check for WiFi connection
       - script.execute: scr_timer_wait_for_wifi
-      - lambda: 'id(ota_sleep_control_state) = 4;'
-      # While our timer is running AND we haven't yet connected to WiFi
-      - while:
+      - lambda: 'id(ota_sleep_control_state) = 3;'
+      - while: # While our timer is running AND we haven't yet connected to WiFi
           condition:
             lambda: 'return (id(scr_timer_wait_for_wifi).is_running() && !id(wifi_wificomponent_id).is_connected());'
           then:
@@ -143,24 +127,35 @@ script:
                 format: "Waiting for WiFi connection..."
                 level: WARN
             - delay: 1s
-      - if:
+      - if: # If we are not connected to WiFi but credentials are stored
           condition:
-            lambda: 'return !id(wifi_wificomponent_id).is_connected();'
+            lambda: 'return !id(wifi_wificomponent_id).is_connected() && id(wifi_wificomponent_id).has_sta();'
           then:
-            # Not connected to WiFi
-            - if:
+            - logger.log:
+                format: "WiFi not connected, but credentials are stored -- sleeping to save battery."
+                level: WARN
+            - deep_sleep.enter: deep_sleep_1
+      # Now connected to WiFi
+      - if: # If API has never been connected once
+          condition:
+            lambda: 'return id(ota_sleep_control_api_setup) == 0;'
+          then:
+            # Reset the initial setup timer and give the user more time to configure in Home Assistant etc.
+            - lambda: 'id(ota_sleep_control_state) = 4;'
+            - script.stop: scr_wait_for_initial_setup
+            - script.execute: scr_wait_for_initial_setup
+            - while: # While the setup timer is running
                 condition:
-                  lambda: 'return id(wifi_wificomponent_id).has_sta();'
+                  lambda: 'return id(scr_wait_for_initial_setup).is_running();'
                 then:
                   - logger.log:
-                      format: "WiFi not connected, but credentials are stored -- sleeping to save battery."
+                      format: "Waiting for API initial setup..."
                       level: WARN
-                  - deep_sleep.enter: deep_sleep_1
-      # Connected to WiFi
-      - script.execute: scr_timer_wait_for_api_connection
+                  - delay: 1s
+      # Now wait for API connection
       - lambda: 'id(ota_sleep_control_state) = 5;'
-      # While our timer is running AND we aren't connected to home assistant
-      - while:
+      - script.execute: scr_timer_wait_for_api_connection
+      - while: # While our timer is running AND we aren't connected to Home Assistant
           condition:
             lambda: 'return (id(scr_timer_wait_for_api_connection).is_running() && !id(gs_api).is_connected());'
           then:
@@ -168,19 +163,20 @@ script:
                 format: "Waiting for API connection..."
                 level: WARN
             - delay: 1s
-      - if:
+      - if: # If API is still not connected
           condition:
             lambda: 'return !id(gs_api).is_connected();'
           then:
-            # API not connected
             - logger.log:
                 format: "No API connection -- sleeping to save battery."
                 level: WARN
             - deep_sleep.enter: deep_sleep_1
+      # Now API connected
+      - lambda: |-
+          id(ota_sleep_control_state) = 6;
+          id(ota_sleep_control_api_setup) = 1;
       - script.execute: scr_timer_wait_for_ota_update_mode
-      - lambda: 'id(ota_sleep_control_state) = 6;'
-      # While our timer is running AND we don't have any state from Home Assistant for 'ota_update_mode' entity
-      - while:
+      - while: # While our timer is running AND we don't have any state from Home Assistant for 'ota_update_mode' entity
           condition:
             lambda: 'return (id(scr_timer_wait_for_ota_update_mode).is_running() && id(ota_update_mode).state == "");'
           then:
@@ -192,13 +188,12 @@ script:
                 service: 'homeassistant.update_entity'
                 data:
                   entity_id: ${home_assistant_ota_entity_id}
-      - if:
+      - if: # If we never got the ota_update_mode flag (or not 'on'/'off'), probably be unconfigured in HA
           condition:
             text_sensor.state:
               id: ota_update_mode
               state: ''
           then:
-            # No state or unexpected state (not 'on'/'off'), probably be unconfigured in HA
             - logger.log:
                 format: "Home Assistant '${home_assistant_ota_entity_id}' not found."
                 level: ERROR
@@ -206,10 +201,17 @@ script:
                 format: "Please read the manual to configure OTA update mode switch in Home Assistant."
                 level: ERROR
             - deep_sleep.allow: deep_sleep_1
-      - lambda: 'id(ota_sleep_control_state) = 0;'
+      - lambda: 'id(ota_sleep_control_state) = 0;' # Reset state when finished
 
+# Globals
 globals:
+  # OTA sleep control state
   - id: ota_sleep_control_state
     type: int
     restore_value: no
+    initial_value: '0'
+  # Persistent flag regarding if API has ever connected
+  - id: ota_sleep_control_api_setup
+    type: int
+    restore_value: yes
     initial_value: '0'
