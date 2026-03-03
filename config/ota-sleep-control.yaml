@@ -108,7 +108,7 @@ script:
                   lambda: 'return (id(scr_wait_for_initial_setup).is_running() && !id(wifi_wificomponent_id).is_connected());'
                 then:
                   - logger.log:
-                      format: "Waiting for WiFi initial setup..."
+                      format: "Waiting for initial WiFi setup..."
                       level: WARN
                   - delay: 1s
             - if: # If we still aren't connected to WiFi goto sleep to save the battery
@@ -201,6 +201,7 @@ script:
             - logger.log:
                 format: "Please read the manual to configure OTA update mode switch in Home Assistant."
                 level: ERROR
+            - delay: 1s
             - deep_sleep.allow: deep_sleep_1
       - lambda: 'id(ota_sleep_control_state) = 0;' # Reset state when finished
 
