@@ -146,10 +146,10 @@ script:
             - script.execute: scr_wait_for_initial_setup
             - while: # While the setup timer is running
                 condition:
-                  lambda: 'return id(scr_wait_for_initial_setup).is_running();'
+                  lambda: 'return (id(scr_wait_for_initial_setup).is_running() && !id(gs_api).is_connected());'
                 then:
                   - logger.log:
-                      format: "Waiting for API initial setup..."
+                      format: "Waiting for initial API setup..."
                       level: WARN
                   - delay: 1s
       # Now wait for API connection
@@ -170,6 +170,7 @@ script:
             - logger.log:
                 format: "No API connection -- sleeping to save battery."
                 level: WARN
+            - delay: 1s
             - deep_sleep.enter: deep_sleep_1
       # Now API connected
       - lambda: |-
