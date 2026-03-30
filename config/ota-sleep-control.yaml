@@ -6,7 +6,7 @@
 #   ota_update_mode:
 #     name: "OTA Update Mode"
 #     initial: off
-#     icon: mdi:nature-people
+#     icon: mdi:chip
 
 # To use this module, you must have these definitions in your main yaml file:
 # api:
@@ -144,7 +144,7 @@ script:
             - lambda: 'id(ota_sleep_control_state) = 4;'
             - script.stop: scr_wait_for_initial_setup
             - script.execute: scr_wait_for_initial_setup
-            - while: # While the setup timer is running
+            - while: # While the setup timer is running and we aren't connected to the API
                 condition:
                   lambda: 'return (id(scr_wait_for_initial_setup).is_running() && !id(gs_api).is_connected());'
                 then:
@@ -189,7 +189,7 @@ script:
                 service: 'homeassistant.update_entity'
                 data:
                   entity_id: ${home_assistant_ota_entity_id}
-      - if: # If we never got the ota_update_mode flag (or not 'on'/'off'), probably be unconfigured in HA
+      - if: # If we never got the ota_update_mode flag (or not 'on'/'off'), probably it's unconfigured in HA
           condition:
             text_sensor.state:
               id: ota_update_mode

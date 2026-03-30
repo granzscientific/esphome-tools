@@ -1,0 +1,26 @@
+' State diagram description for PlantUML
+' Compile image with "java -jar plantuml.jar <filename>"
+
+@startuml
+scale 4000*4000
+
+[*] --> Connecting
+Connecting --> EnableAP: WiFi not configured
+Connecting --> WaitForAPI: WiFi connected
+Connecting --> [*]: Timed out, 45s no connection
+EnableAP --> Connecting: WiFi credentials set
+EnableAP --> [*]: Timed out, 5min no WiFi credentials
+WaitForAPI --> SetupAPI: API never configured
+WaitForAPI --> WaitForOTAModeFlag: API connected
+WaitForAPI --> [*]: Timed out, 45s no API connection
+SetupAPI --> WaitForOTAModeFlag: API connected
+SetupAPI --> [*]: Timed out, 5min no API connection
+WaitForOTAModeFlag --> PreventDeepSleep: OTAModeFlag set 'on'
+WaitForOTAModeFlag --> AllowDeepSleep: OTAModeFlag set 'off' or N/A
+PreventDeepSleep --> Running
+AllowDeepSleep --> Running
+Running --> Running: OTAModeFlag set 'on'
+Running --> [*]: Sleep after 45s, if sleep allowed
+
+@enduml
+
