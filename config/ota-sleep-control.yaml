@@ -51,21 +51,26 @@ text_sensor:
     id: ota_update_mode
     on_value:
       then:
+
         - if:
             condition:
-              text_sensor.state:
-                id: ota_update_mode
-                state: 'on'
+              lambda: 'return id(ota_sleep_control_api_setup) == 1;'
             then:
-              - logger.log:
-                  format: "OTA update mode active -- preventing sleep."
-                  level: WARN
-              - deep_sleep.prevent: deep_sleep_1
-            else:
-              - logger.log:
-                  format: "OTA update mode inactive -- will sleep between readings."
-                  level: WARN
-              - deep_sleep.allow: deep_sleep_1
+              - if:
+                  condition:
+                    text_sensor.state:
+                      id: ota_update_mode
+                      state: 'on'
+                  then:
+                    - logger.log:
+                        format: "OTA update mode active -- preventing sleep."
+                        level: WARN
+                    - deep_sleep.prevent: deep_sleep_1
+                  else:
+                    - logger.log:
+                        format: "OTA update mode inactive -- will sleep between readings."
+                        level: WARN
+                    - deep_sleep.allow: deep_sleep_1
 
 # Scripts
 script:
@@ -217,16 +222,15 @@ script:
                 level: WARN
             - script.stop: scr_wait_for_initial_setup
             - script.execute: scr_wait_for_initial_setup
-            - while: # While the setup timer is running and we aren't connected to the API
+            - while: # While the setup timer is running
                 condition:
                   lambda: 'return id(scr_wait_for_initial_setup).is_running();'
                 then:
                   - delay: 1s
-      # Reset states when finished
-      - lambda: |-
-          id(ota_sleep_control_state) = 0;
-          id(ota_sleep_control_api_setup) = 1;
-      - deep_sleep.allow: deep_sleep_1
+            - lambda: 'id(ota_sleep_control_api_setup) = 1;'
+            - deep_sleep.allow: deep_sleep_1
+      # Reset state when finished
+      - lambda: 'id(ota_sleep_control_state) = 0;'
 
 # Globals
 globals:
