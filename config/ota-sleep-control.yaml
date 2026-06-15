@@ -175,7 +175,6 @@ script:
       # Now API connected
       - lambda: |-
           id(ota_sleep_control_state) = 6;
-          id(ota_sleep_control_api_setup) = 1;
       - script.execute: scr_timer_wait_for_ota_update_mode
       - while: # While our timer is running AND we don't have any state from Home Assistant for 'ota_update_mode' entity
           condition:
@@ -202,8 +201,32 @@ script:
                 format: "Please read the manual to configure OTA update mode switch in Home Assistant."
                 level: ERROR
             - delay: 1s
-            - deep_sleep.allow: deep_sleep_1
-      - lambda: 'id(ota_sleep_control_state) = 0;' # Reset state when finished
+            - if: # If API has already been connected at least once once
+                condition:
+                  lambda: 'return id(ota_sleep_control_api_setup) == 1;'
+                then:
+                  - deep_sleep.allow: deep_sleep_1
+      - if: # If we just did initial setup
+          condition:
+            lambda: 'return id(ota_sleep_control_api_setup) == 0;'
+          then:
+            # Reset the initial setup timer and give the user more time to configure in Home Assistant etc.
+            - lambda: 'id(ota_sleep_control_state) = 7;'
+            - logger.log:
+                format: "Prevnting sleep for '${wait_for_initial_setup_duration}' after initial setup."
+                level: WARN
+            - script.stop: scr_wait_for_initial_setup
+            - script.execute: scr_wait_for_initial_setup
+            - while: # While the setup timer is running and we aren't connected to the API
+                condition:
+                  lambda: 'return id(scr_wait_for_initial_setup).is_running();'
+                then:
+                  - delay: 1s
+      # Reset states when finished
+      - lambda: |-
+          id(ota_sleep_control_state) = 0;
+          id(ota_sleep_control_api_setup) = 1;
+      - deep_sleep.allow: deep_sleep_1
 
 # Globals
 globals:
