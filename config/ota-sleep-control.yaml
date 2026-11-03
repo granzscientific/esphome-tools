@@ -259,7 +259,7 @@ script:
                   lambda: 'return (id(scr_timer_ota_time_out).is_running() && id(ota_sleep_control_ota_timed_out) == 0);'
                 then:
                   - delay: 1s
-            - lambda: 'id(ota_sleep_control_ota_timed_out) = 1;
+            - lambda: 'id(ota_sleep_control_ota_timed_out) = 1;'
             - logger.log:
                 format: "Timed-out waiting for OTA update (flashing).  Allowing sleep to save battery."
                 level: ERROR
@@ -267,6 +267,7 @@ script:
 
       # Reset state when finished
       - lambda: 'id(ota_sleep_control_state) = 0;'
+
 # Globals
 globals:
   # OTA sleep control state
