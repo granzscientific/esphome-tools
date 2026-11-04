@@ -53,7 +53,7 @@ text_sensor:
     on_value:
       then:
         - if:
-            condition:
+            condition: # Prevent normal sleep until initial setup has been completed
               lambda: 'return id(ota_sleep_control_api_setup) == 1;'
             then:
               - if:
@@ -65,14 +65,14 @@ text_sensor:
                     - logger.log:
                         format: "OTA update mode active -- preventing sleep."
                         level: INFO
+                    - deep_sleep.prevent: deep_sleep_1
                     - script.stop: scr_timer_ota_time_out
                     - script.execute: scr_timer_ota_time_out
-                    - deep_sleep.prevent: deep_sleep_1
                   else:
+                    - lambda: 'id(ota_sleep_control_ota_timed_out) = 0;'
                     - logger.log:
                         format: "OTA update mode inactive -- will sleep between readings."
                         level: INFO
-                    - lambda: 'id(ota_sleep_control_ota_timed_out) = 0;'
                     - deep_sleep.allow: deep_sleep_1
 
 # Scripts
@@ -96,7 +96,21 @@ script:
   # Script that controls the timer for how long before time-out waiting for OTA
   - id: scr_timer_ota_time_out
     then:
+      - if:
+          condition:
+            lambda: 'return (id(ota_sleep_control_ota_timed_out) == 1);'
+          then:
+            - logger.log:
+                format: "Timed-out waiting for OTA update (flashing).  Allowing sleep to save battery."
+                level: ERROR
+            - deep_sleep.allow: deep_sleep_1
       - delay: ${ota_time_out_duration}
+      - lambda: 'id(ota_sleep_control_ota_timed_out) = 1;'
+      - logger.log:
+          format: "Timed-out waiting for OTA update (flashing).  Allowing sleep to save battery."
+          level: ERROR
+      - deep_sleep.allow: deep_sleep_1
+
   # Main script that runs on boot to control if we go to sleep or stay awake (for setup, OTA update etc.)
   - id: scr_sleep_control
     then:
@@ -237,6 +251,7 @@ script:
                 then:
                   - delay: 1s
             - lambda: 'id(ota_sleep_control_api_setup) = 1;'
+            - lambda: 'id(ota_sleep_control_ota_timed_out) = 0;'
             - logger.log:
                 format: "Initial setup marked as complete."
                 level: INFO
@@ -248,7 +263,6 @@ script:
                 then:
                   - script.stop: scr_timer_ota_time_out
                   - script.execute: scr_timer_ota_time_out
-                  - lambda: 'id(ota_sleep_control_ota_timed_out) = 0;'
                   - logger.log:
                       format: "OTA update mode active -- preventing sleep."
                       level: INFO
@@ -259,23 +273,23 @@ script:
                       level: INFO
                   - deep_sleep.allow: deep_sleep_1
 
-      - if: # Check the OTA flag
-          condition:
-            text_sensor.state:
-              id: ota_update_mode
-              state: 'on'
-          then:
-            - lambda: 'id(ota_sleep_control_state) = 8;'
-            - while: # While our OTA time-out timer is running
-                condition:
-                  lambda: 'return (id(scr_timer_ota_time_out).is_running() && id(ota_sleep_control_ota_timed_out) == 0);'
-                then:
-                  - delay: 1s
-            - lambda: 'id(ota_sleep_control_ota_timed_out) = 1;'
-            - logger.log:
-                format: "Timed-out waiting for OTA update (flashing).  Allowing sleep to save battery."
-                level: ERROR
-            - deep_sleep.allow: deep_sleep_1
+      #- if: # Check the OTA flag
+      #    condition:
+      #      text_sensor.state:
+      #        id: ota_update_mode
+      #        state: 'on'
+      #    then:
+      #      - lambda: 'id(ota_sleep_control_state) = 8;'
+      #      - while: # While our OTA time-out timer is running
+      #          condition:
+      #            lambda: 'return (id(scr_timer_ota_time_out).is_running() && id(ota_sleep_control_ota_timed_out) == 0);'
+      #          then:
+      #            - delay: 1s
+      #      - lambda: 'id(ota_sleep_control_ota_timed_out) = 1;'
+      #      - logger.log:
+      #          format: "Timed-out waiting for OTA update (flashing).  Allowing sleep to save battery."
+      #          level: ERROR
+      #      - deep_sleep.allow: deep_sleep_1
 
       # Reset state when finished
       - lambda: 'id(ota_sleep_control_state) = 0;'
