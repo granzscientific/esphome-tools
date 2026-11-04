@@ -64,14 +64,14 @@ text_sensor:
                   then:
                     - logger.log:
                         format: "OTA update mode active -- preventing sleep."
-                        level: WARN
+                        level: INFO
                     - script.stop: scr_timer_ota_time_out
                     - script.execute: scr_timer_ota_time_out
                     - deep_sleep.prevent: deep_sleep_1
                   else:
                     - logger.log:
                         format: "OTA update mode inactive -- will sleep between readings."
-                        level: WARN
+                        level: INFO
                     - lambda: 'id(ota_sleep_control_ota_timed_out) = 0;'
                     - deep_sleep.allow: deep_sleep_1
 
@@ -226,14 +226,17 @@ script:
             - script.stop: scr_wait_for_initial_setup
             - script.execute: scr_wait_for_initial_setup
             - logger.log:
-                format: "Prevnting sleep for '${wait_for_initial_setup_duration}' after initial setup."
-                level: WARN
+                format: "Preventing sleep for '${wait_for_initial_setup_duration}' after initial setup."
+                level: INFO
             - while: # While the setup timer is running
                 condition:
                   lambda: 'return id(scr_wait_for_initial_setup).is_running();'
                 then:
                   - delay: 1s
             - lambda: 'id(ota_sleep_control_api_setup) = 1;'
+            - logger.log:
+                format: "Initial setup marked as complete."
+                level: INFO
             - if: # Check the OTA flag
                 condition:
                   text_sensor.state:
@@ -243,8 +246,14 @@ script:
                   - script.stop: scr_timer_ota_time_out
                   - script.execute: scr_timer_ota_time_out
                   - lambda: 'id(ota_sleep_control_ota_timed_out) = 0;'
+                  - logger.log:
+                      format: "OTA update mode active -- preventing sleep."
+                      level: INFO
                   - deep_sleep.prevent: deep_sleep_1
                 else:
+                  - logger.log:
+                      format: "OTA update mode inactive -- will sleep between readings."
+                      level: INFO
                   - deep_sleep.allow: deep_sleep_1
 
       - if: # Check the OTA flag
