@@ -109,7 +109,7 @@ script:
           then:
             - logger.log:
                 format: "No WiFi credentials are stored -- staying awake for ${wait_for_initial_setup_duration} to allow initial setup."
-                level: ERROR
+                level: WARN
             - lambda: |- # Force AP on (this may not be needed because of default behavior)
                 id(wifi_wificomponent_id).set_ap_timeout(1);
                 id(wifi_wificomponent_id).enable();
@@ -117,7 +117,7 @@ script:
             - script.execute: scr_wait_for_initial_setup
             - logger.log:
                 format: "Waiting for initial WiFi setup..."
-                level: WARN
+                level: INFO
             - while: # While our timer is running AND we haven't yet connected to WiFi
                 condition:
                   lambda: 'return (id(scr_wait_for_initial_setup).is_running() && !id(wifi_wificomponent_id).is_connected());'
@@ -133,7 +133,7 @@ script:
       - lambda: 'id(ota_sleep_control_state) = 3;'
       - logger.log:
           format: "Waiting for WiFi connection..."
-          level: WARN
+          level: INFO
       - while: # While our timer is running AND we haven't yet connected to WiFi
           condition:
             lambda: 'return (id(scr_timer_wait_for_wifi).is_running() && !id(wifi_wificomponent_id).is_connected());'
@@ -158,7 +158,7 @@ script:
             - script.execute: scr_wait_for_initial_setup
             - logger.log:
                 format: "Waiting for initial API setup..."
-                level: WARN
+                level: INFO
             - while: # While the setup timer is running and we aren't connected to the API
                 condition:
                   lambda: 'return (id(scr_wait_for_initial_setup).is_running() && !id(gs_api).is_connected());'
@@ -169,7 +169,7 @@ script:
       - script.execute: scr_timer_wait_for_api_connection
       - logger.log:
           format: "Waiting for API connection..."
-          level: WARN
+          level: INFO
       - while: # While our timer is running AND we aren't connected to Home Assistant
           condition:
             lambda: 'return (id(scr_timer_wait_for_api_connection).is_running() && !id(gs_api).is_connected());'
@@ -189,7 +189,7 @@ script:
       - script.execute: scr_timer_wait_for_ota_update_mode
       - logger.log:
           format: "Waiting for Home Assistant '${home_assistant_ota_entity_id}' state..."
-          level: WARN
+          level: INFO
       - while: # While our timer is running AND we don't have any state from Home Assistant for 'ota_update_mode' entity
           condition:
             lambda: 'return (id(scr_timer_wait_for_ota_update_mode).is_running() && id(ota_update_mode).state == "");'
@@ -217,6 +217,9 @@ script:
                   lambda: 'return id(ota_sleep_control_api_setup) == 1;'
                 then:
                   - deep_sleep.allow: deep_sleep_1
+      - logger.log:
+          format: "Received Home Assistant '${home_assistant_ota_entity_id}' state..."
+          level: INFO
       - if: # If we just did initial setup
           condition:
             lambda: 'return id(ota_sleep_control_api_setup) == 0;'
