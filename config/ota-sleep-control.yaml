@@ -19,8 +19,8 @@ substitutions:
   wait_for_initial_setup_duration: 5min
   wait_for_wifi_duration: 10s
   wait_for_api_connection_duration: 30s
-  wait_for_ota_update_mode_duration: 5s
-  ota_time_out_duration: 1h
+  #wait_for_ota_update_mode_duration: 5s
+  #ota_time_out_duration: 1h
   sleep_duration: 30min
   home_assistant_ota_entity_id: input_boolean.ota_update_mode
 
@@ -46,34 +46,34 @@ text_sensor:
     internal: True # Hide from home assisstant
   # This text_sensor controls re-enabling deep sleep when the HA service indicates
   # there is no longer an OTA update available.
-  - platform: homeassistant
-    name: "OTA Update Mode"
-    entity_id: ${home_assistant_ota_entity_id}
-    id: ota_update_mode
-    on_value:
-      then:
-        - if:
-            condition: # Prevent normal sleep until initial setup has been completed
-              lambda: 'return id(ota_sleep_control_api_setup) == 1;'
-            then:
-              - if:
-                  condition:
-                    text_sensor.state:
-                      id: ota_update_mode
-                      state: 'on'
-                  then:
-                    - logger.log:
-                        format: "OTA update mode active -- preventing sleep."
-                        level: INFO
-                    - deep_sleep.prevent: deep_sleep_1
-                    - script.stop: scr_timer_ota_time_out
-                    - script.execute: scr_timer_ota_time_out
-                  else:
-                    - lambda: 'id(ota_sleep_control_ota_timed_out) = 0;'
-                    - logger.log:
-                        format: "OTA update mode inactive -- will sleep between readings."
-                        level: INFO
-                    - deep_sleep.allow: deep_sleep_1
+  #- platform: homeassistant
+  #  name: "OTA Update Mode"
+  #  entity_id: ${home_assistant_ota_entity_id}
+  #  id: ota_update_mode
+  #  on_value:
+  #    then:
+  #      - if:
+  #          condition: # Prevent normal sleep until initial setup has been completed
+  #            lambda: 'return id(ota_sleep_control_api_setup) == 1;'
+  #          then:
+  #            - if:
+  #                condition:
+  #                  text_sensor.state:
+  #                    id: ota_update_mode
+  #                    state: 'on'
+  #                then:
+  #                  - logger.log:
+  #                      format: "OTA update mode active -- preventing sleep."
+  #                      level: INFO
+  #                  - deep_sleep.prevent: deep_sleep_1
+  #                  - script.stop: scr_timer_ota_time_out
+  #                  - script.execute: scr_timer_ota_time_out
+  #                else:
+  #                  - lambda: 'id(ota_sleep_control_ota_timed_out) = 0;'
+  #                  - logger.log:
+  #                      format: "OTA update mode inactive -- will sleep between readings."
+  #                      level: INFO
+  #                  - deep_sleep.allow: deep_sleep_1
 
 # Scripts
 script:
@@ -90,26 +90,26 @@ script:
     then:
       - delay: ${wait_for_api_connection_duration}
   # Script that controls the timer for how long we look for the HA connection
-  - id: scr_timer_wait_for_ota_update_mode
-    then:
-      - delay: ${wait_for_ota_update_mode_duration}
+  #- id: scr_timer_wait_for_ota_update_mode
+  #  then:
+  #    - delay: ${wait_for_ota_update_mode_duration}
   # Script that controls the timer for how long before time-out waiting for OTA
-  - id: scr_timer_ota_time_out
-    then:
-      - if:
-          condition:
-            lambda: 'return (id(ota_sleep_control_ota_timed_out) == 1);'
-          then:
-            - logger.log:
-                format: "Timed-out waiting for OTA update (flashing).  Allowing sleep to save battery."
-                level: ERROR
-            - deep_sleep.allow: deep_sleep_1
-      - delay: ${ota_time_out_duration}
-      - lambda: 'id(ota_sleep_control_ota_timed_out) = 1;'
-      - logger.log:
-          format: "Timed-out waiting for OTA update (flashing).  Allowing sleep to save battery."
-          level: ERROR
-      - deep_sleep.allow: deep_sleep_1
+  #- id: scr_timer_ota_time_out
+  #  then:
+  #    - if:
+  #        condition:
+  #          lambda: 'return (id(ota_sleep_control_ota_timed_out) == 1);'
+  #        then:
+  #          - logger.log:
+  #              format: "Timed-out waiting for OTA update (flashing).  Allowing sleep to save battery."
+  #              level: ERROR
+  #          - deep_sleep.allow: deep_sleep_1
+  #    - delay: ${ota_time_out_duration}
+  #    - lambda: 'id(ota_sleep_control_ota_timed_out) = 1;'
+  #    - logger.log:
+  #        format: "Timed-out waiting for OTA update (flashing).  Allowing sleep to save battery."
+  #        level: ERROR
+  #    - deep_sleep.allow: deep_sleep_1
 
   # Main script that runs on boot to control if we go to sleep or stay awake (for setup, OTA update etc.)
   - id: scr_sleep_control
@@ -198,43 +198,43 @@ script:
                 level: WARN
             - delay: 1s
             - deep_sleep.enter: deep_sleep_1
-      # Now API connected
+      # Now API is connected
       - lambda: 'id(ota_sleep_control_state) = 6;'
-      - script.execute: scr_timer_wait_for_ota_update_mode
-      - logger.log:
-          format: "Waiting for Home Assistant '${home_assistant_ota_entity_id}' state..."
-          level: INFO
-      - while: # While our timer is running AND we don't have any state from Home Assistant for 'ota_update_mode' entity
-          condition:
-            lambda: 'return (id(scr_timer_wait_for_ota_update_mode).is_running() && id(ota_update_mode).state == "");'
-          then:
-            - delay: 1s
-            - homeassistant.service:
-                service: 'homeassistant.update_entity'
-                data:
-                  entity_id: ${home_assistant_ota_entity_id}
-      - if: # If we never got the ota_update_mode flag (or not 'on'/'off'), probably it's unconfigured in HA
-          condition:
-            text_sensor.state:
-              id: ota_update_mode
-              state: ''
-          then:
-            - logger.log:
-                format: "Home Assistant '${home_assistant_ota_entity_id}' not found."
-                level: ERROR
-            - logger.log:
-                format: "Please read the manual to configure OTA update mode switch in Home Assistant."
-                level: ERROR
-            - delay: 1s
-            - if: # If API has already been connected at least once once
-                condition:
-                  lambda: 'return id(ota_sleep_control_api_setup) == 1;'
-                then:
-                  - deep_sleep.allow: deep_sleep_1
-      - logger.log:
-          format: "Received Home Assistant '${home_assistant_ota_entity_id}' state..."
-          level: INFO
-      - if: # If we just did initial setup
+      #- script.execute: scr_timer_wait_for_ota_update_mode
+      #- logger.log:
+      #    format: "Waiting for Home Assistant '${home_assistant_ota_entity_id}' state..."
+      #    level: INFO
+      #- while: # While our timer is running AND we don't have any state from Home Assistant for 'ota_update_mode' entity
+      #    condition:
+      #      lambda: 'return (id(scr_timer_wait_for_ota_update_mode).is_running() && id(ota_update_mode).state == "");'
+      #    then:
+      #      - delay: 1s
+      #      - homeassistant.service:
+      #          service: 'homeassistant.update_entity'
+      #          data:
+      #            entity_id: ${home_assistant_ota_entity_id}
+      #- if: # If we never got the ota_update_mode flag (or not 'on'/'off'), probably it's unconfigured in HA
+      #    condition:
+      #      text_sensor.state:
+      #        id: ota_update_mode
+      #        state: ''
+      #    then:
+      #      - logger.log:
+      #          format: "Home Assistant '${home_assistant_ota_entity_id}' not found."
+      #          level: ERROR
+      #      - logger.log:
+      #          format: "Please read the manual to configure OTA update mode switch in Home Assistant."
+      #          level: ERROR
+      #      - delay: 1s
+      #      - if: # If API has already been connected at least once once
+      #          condition:
+      #            lambda: 'return id(ota_sleep_control_api_setup) == 1;'
+      #          then:
+      #            - deep_sleep.allow: deep_sleep_1
+      #- logger.log:
+      #    format: "Received Home Assistant '${home_assistant_ota_entity_id}' state..."
+      #    level: INFO
+      - if: # If we just did initial setup, we stay awake for a bit for the user to see it working...
           condition:
             lambda: 'return id(ota_sleep_control_api_setup) == 0;'
           then:
@@ -251,48 +251,31 @@ script:
                 then:
                   - delay: 1s
             - lambda: 'id(ota_sleep_control_api_setup) = 1;'
-            - lambda: 'id(ota_sleep_control_ota_timed_out) = 0;'
+            #- lambda: 'id(ota_sleep_control_ota_timed_out) = 0;'
             - logger.log:
                 format: "Initial setup marked as complete."
                 level: INFO
-            - if: # Check the OTA flag
-                condition:
-                  text_sensor.state:
-                    id: ota_update_mode
-                    state: 'on'
-                then:
-                  - script.stop: scr_timer_ota_time_out
-                  - script.execute: scr_timer_ota_time_out
-                  - logger.log:
-                      format: "OTA update mode active -- preventing sleep."
-                      level: INFO
-                  - deep_sleep.prevent: deep_sleep_1
-                else:
-                  - logger.log:
-                      format: "OTA update mode inactive -- will sleep between readings."
-                      level: INFO
-                  - deep_sleep.allow: deep_sleep_1
+            #- if: # Check the OTA flag
+            #    condition:
+            #      text_sensor.state:
+            #        id: ota_update_mode
+            #        state: 'on'
+            #    then:
+            #      - script.stop: scr_timer_ota_time_out
+            #      - script.execute: scr_timer_ota_time_out
+            #      - logger.log:
+            #          format: "OTA update mode active -- preventing sleep."
+            #          level: INFO
+            #      - deep_sleep.prevent: deep_sleep_1
+            #    else:
+            #      - logger.log:
+            #          format: "OTA update mode inactive -- will sleep between readings."
+            #          level: INFO
+            #      - deep_sleep.allow: deep_sleep_1
 
-      #- if: # Check the OTA flag
-      #    condition:
-      #      text_sensor.state:
-      #        id: ota_update_mode
-      #        state: 'on'
-      #    then:
-      #      - lambda: 'id(ota_sleep_control_state) = 8;'
-      #      - while: # While our OTA time-out timer is running
-      #          condition:
-      #            lambda: 'return (id(scr_timer_ota_time_out).is_running() && id(ota_sleep_control_ota_timed_out) == 0);'
-      #          then:
-      #            - delay: 1s
-      #      - lambda: 'id(ota_sleep_control_ota_timed_out) = 1;'
-      #      - logger.log:
-      #          format: "Timed-out waiting for OTA update (flashing).  Allowing sleep to save battery."
-      #          level: ERROR
-      #      - deep_sleep.allow: deep_sleep_1
-
-      # Reset state when finished
+      # Reset state and allow sleep when finished
       - lambda: 'id(ota_sleep_control_state) = 0;'
+      - deep_sleep.allow: deep_sleep_1
 
 # Globals
 globals:
@@ -301,7 +284,7 @@ globals:
     type: int
     restore_value: no
     initial_value: '0'
-  # Persistent flag regarding if API has ever connected
+  # Persistent flag regarding if API has ever connected at least once
   - id: ota_sleep_control_api_setup
     type: int
     restore_value: yes
@@ -309,7 +292,7 @@ globals:
   # Persistent flag regarding if we timed-out waiting for OTA update
   # We maintain this flag in case the user forgets to actually re-flash the device, so that we don't stay
   # awake forever draining the battery etc.
-  - id: ota_sleep_control_ota_timed_out
-    type: int
-    restore_value: yes
-    initial_value: '0'
+  #- id: ota_sleep_control_ota_timed_out
+  #  type: int
+  #  restore_value: yes
+  #  initial_value: '0'

@@ -11,16 +11,12 @@ Connecting --> [*]: Timed out, 45s no connection
 EnableAP --> Connecting: WiFi credentials set
 EnableAP --> [*]: Timed out, 5min no WiFi credentials
 WaitForAPI --> SetupAPI: API never configured
-WaitForAPI --> WaitForOTAModeFlag: API connected
+WaitForAPI --> Running: API connected
 WaitForAPI --> [*]: Timed out, 45s no API connection
-SetupAPI --> WaitForOTAModeFlag: API connected
+SetupAPI --> InitialSetupOnTimer: API connected
 SetupAPI --> [*]: Timed out, 5min no API connection
-WaitForOTAModeFlag --> PreventDeepSleep: OTAModeFlag set 'on'
-WaitForOTAModeFlag --> AllowDeepSleep: OTAModeFlag set 'off' or N/A
-PreventDeepSleep --> Running
-AllowDeepSleep --> Running
-Running --> Running: OTAModeFlag set 'on'
-Running --> [*]: Sleep after 45s, if sleep allowed
+InitialSetupOnTimer --> Running: Initial setup timer finished
+Running --> [*]: Normal sleep after 45s
 
 @enduml
 
