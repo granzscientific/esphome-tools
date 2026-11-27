@@ -11,6 +11,7 @@ substitutions:
   wait_for_wifi_duration: 10s
   wait_for_api_connection_duration: 30s
   wait_after_initial_api_connection: 5min
+  run_duration: 45s
   sleep_duration: 30min
   home_assistant_ota_entity_id: input_boolean.ota_update_mode
 
@@ -23,7 +24,7 @@ substitutions:
 # Note that the script below for OTA updates will inhibit this so run_duration here is irrelevant
 deep_sleep:
   id: deep_sleep_1
-  run_duration: 45s
+  run_duration: ${run_duration}
   sleep_duration: ${sleep_duration}
 
 # Text sensors
